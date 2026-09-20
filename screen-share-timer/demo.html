@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Screen Share Timer</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #fafafa;
+        --fg: #18181b;
+        --muted: #71717a;
+        --line: #e4e4e7;
+        --card: #fff;
+        --accent: #2563eb;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #09090b;
+          --fg: #fafafa;
+          --muted: #a1a1aa;
+          --line: #27272a;
+          --card: #18181b;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px 16px;
+        background: var(--bg);
+        color: var(--fg);
+        font:
+          15px/1.55 ui-sans-serif,
+          system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      main {
+        max-width: 560px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 4px;
+      }
+      p.sub {
+        margin: 0 0 24px;
+        color: var(--muted);
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 20px;
+      }
+      label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .row > div {
+        flex: 1;
+      }
+      input {
+        width: 100%;
+        padding: 9px 11px;
+        font: inherit;
+        color: inherit;
+        background: transparent;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      button {
+        font: 600 14px/1 inherit;
+        padding: 11px 16px;
+        border: 0;
+        border-radius: 8px;
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      #status {
+        margin-top: 14px;
+        font-size: 13px;
+        color: var(--muted);
+        min-height: 20px;
+      }
+      video {
+        width: 100%;
+        margin-top: 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #000;
+        display: none;
+      }
+      video.live {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Screen share timer</h1>
+      <p class="sub">Starts a real screen share and cuts it off when the clock runs out.</p>
+      <div class="card">
+        <div class="row">
+          <div>
+            <label for="limit">Stop after (minutes)</label>
+            <input id="limit" type="number" min="0.1" step="0.5" value="15" />
+          </div>
+          <div>
+            <label for="warn">Warn me (seconds before)</label>
+            <input id="warn" type="number" min="0" step="5" value="60" />
+          </div>
+        </div>
+        <button id="start">Start screen share</button>
+        <div id="status"></div>
+        <video id="preview" muted autoplay playsinline></video>
+      </div>
+    </main>
+
+    <script src="./screen-share-timer.js"></script>
+    <script>
+      const statusEl = document.getElementById('status');
+      const startBtn = document.getElementById('start');
+      const preview = document.getElementById('preview');
+
+      function say(text) {
+        statusEl.textContent = text;
+      }
+
+      startBtn.addEventListener('click', async () => {
+        const limitMinutes = parseFloat(document.getElementById('limit').value);
+        const warnSeconds = parseFloat(document.getElementById('warn').value);
+
+        // Installing on each click keeps the latest limit/warn values in effect.
+        ScreenShareTimer.install({
+          limitMinutes,
+          warnSeconds,
+          onWarn: (_stream, secondsLeft) => say(`Wrapping up — ${secondsLeft}s left.`),
+          onEnd: (_stream, reason) =>
+            say(reason === 'timeout' ? 'Time is up. Share stopped.' : 'Share stopped.'),
+        });
+
+        try {
+          startBtn.disabled = true;
+          const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+          preview.srcObject = stream;
+          preview.classList.add('live');
+          say(`Sharing. Auto-stop in ${limitMinutes} minute(s).`);
+          stream.getVideoTracks()[0].addEventListener('ended', () => {
+            preview.classList.remove('live');
+            preview.srcObject = null;
+            startBtn.disabled = false;
+          });
+        } catch (err) {
+          startBtn.disabled = false;
+          say(err && err.name === 'NotAllowedError' ? 'Share cancelled.' : `Failed: ${err}`);
+        }
+      });
+    </script>
+  </body>
+</html>
