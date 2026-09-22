@@ -30,6 +30,13 @@ runtime. Paste and run them directly.
    Read it, set `DRY_RUN = false`, run again. `MODE = "REVERT"` undoes it even
    after a save. This is the biggest visual change per hour in the repo, so do
    it first and look at the result before building anything.
+
+   **Run it once per level.** Scope `CONFIG.ROOT` to that level's model and set
+   `CONFIG.PRESET` to match — `"Lava"`, `"Forest"`, `"Jungle"`, `"Snow"` or
+   `"Neutral"`. Each preset carries its own sun, atmosphere, post-processing
+   and colour-to-material map, because the correct answer differs per biome: a
+   near-white part should become `Snow` on the snow level and `Concrete`
+   everywhere else. One global map gets that wrong every time.
 2. **`scripts/ParkourMetricsRig.luau`** — measures what your character can
    actually clear and builds a labelled row of test gaps. Run this before
    placing a single platform.
@@ -42,7 +49,8 @@ Studio's Properties panel. No script needs editing to author a level.
 
 | Tag | Put it on | Attributes |
 | --- | --- | --- |
-| `LavaVolume` | each lava part | — |
+| `LavaVolume` | each static lava part | — |
+| `RisingLava` | the rising lava plane | — |
 | `Checkpoint` | a part at each safe point | — |
 | `MonkeySpawner` | one part per monkey | — |
 | `MonkeyPerch` | parts in the canopy | — |
@@ -56,6 +64,41 @@ Studio's Properties panel. No script needs editing to author a level.
 
 Every tunable lives in `src/shared/Config.luau`. Nothing else hardcodes a
 number.
+
+## Two lava modes, not one
+
+`LavaService` and `RisingLavaService` are separate on purpose.
+
+**Static lava** (`LavaVolume`) is a hazard inside a checkpointed parkour level.
+It forgives a clipped toe with a 0.35 s grace window, kills with a short sink so
+the death reads as lava rather than as a trigger volume, and returns you to your
+last checkpoint.
+
+**Rising lava** (`RisingLava`) is an elimination race. The lava is the clock.
+Contact ends your round immediately — no grace window, no checkpoint — because a
+forgiving edge in a race lets players stand in lava to cut a corner. The rise
+accelerates so the pressure lands in the last stretch rather than spreading
+flat across the round, and the HUD warning fires on studs of clearance rather
+than on a timer, since a fixed seconds-based lead would arrive too early at the
+start and too late at the end.
+
+Sharing one damage path between them would make one of the two feel wrong.
+
+## The slide changes your gap math
+
+`Config.Slide` gives a ground slide at 48 studs/s against a walk speed of 16. A
+jump taken out of a slide carries that horizontal speed, so it travels roughly
+**three times** a standing jump.
+
+That splits every gap in the map into two populations, with a **dead zone**
+between them: too far to walk, not far enough to need the slide. A gap in that
+band just makes players fall, retry, and blame the game instead of learning the
+mechanic.
+
+Run `scripts/ParkourMetricsRig.luau` — it now prints both reaches and the dead
+zone between them, and builds two labelled test rows. Put every gap decisively
+on one side, and give slide-required jumps their own platform colour so the
+requirement is readable before the leap rather than after it.
 
 ## Correction on jump distance
 
@@ -82,6 +125,11 @@ your actual settings rather than either figure.
   the service builds a blocky stand-in so the AI is testable before the art
   exists. Drop in a real rig with a `Humanoid` and a `HumanoidRootPart` and it
   is used as-is.
+- **Slide cooldown is not an anti-exploit boundary.** Roblox hands a client
+  network ownership of its own character, so it can write its own velocity
+  whether or not we grant a slide. `SlideService` enforces a consistent cooldown
+  for honest clients and gives the server a truthful "is this player sliding"
+  answer; anything that must not be forged stays authoritative elsewhere.
 - **Lava VFX drop out below 35 FPS.** Lights and embers switch off and the lava
   falls back to its emissive material. Tune via
   `Config.Lava.LowEndFpsThreshold`.

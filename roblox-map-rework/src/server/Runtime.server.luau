@@ -11,11 +11,15 @@ local CheckpointService = require(services:WaitForChild("CheckpointService"))
 local LavaService = require(services:WaitForChild("LavaService"))
 local MonkeyService = require(services:WaitForChild("MonkeyService"))
 local ParkourService = require(services:WaitForChild("ParkourService"))
+local RisingLavaService = require(services:WaitForChild("RisingLavaService"))
+local SlideService = require(services:WaitForChild("SlideService"))
 
 local START_ORDER = {
 	{ name = "CheckpointService", service = CheckpointService },
 	{ name = "LavaService", service = LavaService },
 	{ name = "ParkourService", service = ParkourService },
+	{ name = "SlideService", service = SlideService },
+	{ name = "RisingLavaService", service = RisingLavaService },
 	{ name = "MonkeyService", service = MonkeyService },
 }
 

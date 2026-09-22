@@ -38,6 +38,11 @@ local CONFIG = {
 	--   ROOT = workspace.Stages.Stage1
 	ROOT = workspace,
 
+	-- Which level this run is dressing. Scope ROOT to one stage model and set
+	-- the matching preset, then run once per level.
+	--   "Neutral" | "Lava" | "Forest" | "Jungle" | "Snow"
+	PRESET = "Neutral",
+
 	PHASES = {
 		LIGHTING = true,
 		SURFACES = true,
@@ -66,29 +71,35 @@ local CONFIG = {
 	RANDOM_SEED = 20260922,
 }
 
---[[ Lighting ------------------------------------------------------------- ]]
+--[[ Presets -------------------------------------------------------------- ]]
 
--- Lighting.Technology is not scriptable. The script attempts it, and prints a
--- manual instruction when the engine refuses.
-local LIGHTING_PROPS = {
-	Ambient = Color3.fromRGB(70, 70, 78),
-	OutdoorAmbient = Color3.fromRGB(105, 112, 124),
-	Brightness = 2.4,
-	ExposureCompensation = 0.15,
-	ShadowSoftness = 0.35,
-	GlobalShadows = true,
-	EnvironmentDiffuseScale = 0.45,
-	EnvironmentSpecularScale = 0.35,
-	-- 15:20 rather than high noon. Noon is the flattest possible sun angle and
-	-- is the single biggest reason a map reads as plastic.
-	ClockTime = 15.3,
-	GeographicLatitude = 12,
-}
+--[[
+	One entry per level. Each carries its own sun, atmosphere, post-processing
+	and colour-to-material map, because the right answer differs per biome:
+	near-white parts should become Snow on the snow level and Concrete on every
+	other one. A single global map gets that wrong every time.
 
-local EFFECTS = {
-	{
-		className = "Atmosphere",
-		props = {
+	Lighting.Technology is not scriptable. The script attempts it and prints a
+	manual instruction when the engine refuses.
+]]
+
+local PRESETS = {
+	Neutral = {
+		lighting = {
+			Ambient = Color3.fromRGB(70, 70, 78),
+			OutdoorAmbient = Color3.fromRGB(105, 112, 124),
+			Brightness = 2.4,
+			ExposureCompensation = 0.15,
+			ShadowSoftness = 0.35,
+			GlobalShadows = true,
+			EnvironmentDiffuseScale = 0.45,
+			EnvironmentSpecularScale = 0.35,
+			-- Off high noon. Noon is the flattest possible sun angle and the
+			-- single biggest reason a map reads as plastic.
+			ClockTime = 15.3,
+			GeographicLatitude = 12,
+		},
+		atmosphere = {
 			Density = 0.34,
 			Offset = 0.15,
 			Color = Color3.fromRGB(199, 210, 199),
@@ -96,24 +107,196 @@ local EFFECTS = {
 			Glare = 0.25,
 			Haze = 1.6,
 		},
-	},
-	{
-		className = "ColorCorrectionEffect",
-		props = {
+		colorCorrection = {
 			Brightness = 0.02,
 			Contrast = 0.12,
 			Saturation = 0.14,
 			TintColor = Color3.fromRGB(255, 249, 242),
 		},
+		sunRays = { Intensity = 0.09, Spread = 0.85 },
+		bloom = { Intensity = 0.55, Size = 22, Threshold = 1.1 },
+		materials = {
+			green = Enum.Material.LeafyGrass,
+			brown = Enum.Material.Ground,
+			cold = Enum.Material.Concrete,
+			lightNeutral = Enum.Material.Concrete,
+			darkNeutral = Enum.Material.Slate,
+		},
 	},
-	{
-		className = "SunRaysEffect",
-		props = { Intensity = 0.09, Spread = 0.85 },
+
+	Lava = {
+		lighting = {
+			Ambient = Color3.fromRGB(58, 34, 26),
+			OutdoorAmbient = Color3.fromRGB(122, 74, 52),
+			Brightness = 2.1,
+			ExposureCompensation = 0.25,
+			ShadowSoftness = 0.5,
+			GlobalShadows = true,
+			EnvironmentDiffuseScale = 0.35,
+			EnvironmentSpecularScale = 0.4,
+			-- Low sun. Lava should be the brightest thing on screen, and it
+			-- cannot be if the sky is competing with it.
+			ClockTime = 17.4,
+			GeographicLatitude = 8,
+		},
+		atmosphere = {
+			Density = 0.42,
+			Offset = 0.2,
+			Color = Color3.fromRGB(226, 160, 112),
+			Decay = Color3.fromRGB(140, 58, 28),
+			Glare = 0.55,
+			Haze = 2.4,
+		},
+		colorCorrection = {
+			Brightness = 0.03,
+			Contrast = 0.18,
+			Saturation = 0.26,
+			TintColor = Color3.fromRGB(255, 236, 214),
+		},
+		sunRays = { Intensity = 0.14, Spread = 0.9 },
+		-- Heavier bloom than anywhere else: the reference look is a glow that
+		-- spills off the lava surface, not a flat orange plane.
+		bloom = { Intensity = 0.95, Size = 30, Threshold = 0.85 },
+		materials = {
+			green = Enum.Material.LeafyGrass,
+			brown = Enum.Material.CrackedLava,
+			cold = Enum.Material.Rock,
+			lightNeutral = Enum.Material.Rock,
+			darkNeutral = Enum.Material.Basalt,
+		},
 	},
-	{
-		className = "BloomEffect",
-		props = { Intensity = 0.55, Size = 22, Threshold = 1.1 },
+
+	Forest = {
+		lighting = {
+			Ambient = Color3.fromRGB(64, 74, 68),
+			OutdoorAmbient = Color3.fromRGB(118, 132, 124),
+			Brightness = 2.6,
+			ExposureCompensation = 0.1,
+			ShadowSoftness = 0.4,
+			GlobalShadows = true,
+			EnvironmentDiffuseScale = 0.55,
+			EnvironmentSpecularScale = 0.3,
+			ClockTime = 15.8,
+			GeographicLatitude = 20,
+		},
+		atmosphere = {
+			-- Heavy haze. In the reference shots depth comes from fog, not
+			-- from tree count; distant trunks fade rather than stack up.
+			Density = 0.46,
+			Offset = 0.25,
+			Color = Color3.fromRGB(198, 214, 206),
+			Decay = Color3.fromRGB(88, 116, 102),
+			Glare = 0.3,
+			Haze = 3.1,
+		},
+		colorCorrection = {
+			Brightness = 0.01,
+			Contrast = 0.1,
+			Saturation = 0.12,
+			TintColor = Color3.fromRGB(246, 252, 246),
+		},
+		sunRays = { Intensity = 0.16, Spread = 1 },
+		bloom = { Intensity = 0.5, Size = 24, Threshold = 1.15 },
+		materials = {
+			green = Enum.Material.LeafyGrass,
+			brown = Enum.Material.Wood,
+			cold = Enum.Material.Rock,
+			lightNeutral = Enum.Material.Rock,
+			darkNeutral = Enum.Material.Slate,
+		},
 	},
+
+	Jungle = {
+		lighting = {
+			Ambient = Color3.fromRGB(52, 68, 54),
+			OutdoorAmbient = Color3.fromRGB(96, 122, 100),
+			-- Dimmer than Forest: a canopy is supposed to eat the light.
+			Brightness = 2.2,
+			ExposureCompensation = 0.2,
+			ShadowSoftness = 0.55,
+			GlobalShadows = true,
+			EnvironmentDiffuseScale = 0.5,
+			EnvironmentSpecularScale = 0.25,
+			ClockTime = 14.2,
+			GeographicLatitude = 4,
+		},
+		atmosphere = {
+			Density = 0.52,
+			Offset = 0.3,
+			Color = Color3.fromRGB(186, 208, 180),
+			Decay = Color3.fromRGB(64, 98, 70),
+			Glare = 0.35,
+			Haze = 3.6,
+		},
+		colorCorrection = {
+			Brightness = 0.0,
+			Contrast = 0.14,
+			Saturation = 0.2,
+			TintColor = Color3.fromRGB(242, 252, 240),
+		},
+		sunRays = { Intensity = 0.2, Spread = 1 },
+		bloom = { Intensity = 0.6, Size = 26, Threshold = 1.05 },
+		materials = {
+			green = Enum.Material.LeafyGrass,
+			brown = Enum.Material.Wood,
+			cold = Enum.Material.Rock,
+			lightNeutral = Enum.Material.Rock,
+			darkNeutral = Enum.Material.Mud,
+		},
+	},
+
+	Snow = {
+		lighting = {
+			Ambient = Color3.fromRGB(88, 96, 112),
+			OutdoorAmbient = Color3.fromRGB(146, 160, 184),
+			-- Snow is bright, and under-exposing it is what makes a snow level
+			-- read as grey concrete.
+			Brightness = 3.1,
+			ExposureCompensation = -0.1,
+			ShadowSoftness = 0.65,
+			GlobalShadows = true,
+			EnvironmentDiffuseScale = 0.7,
+			EnvironmentSpecularScale = 0.5,
+			ClockTime = 10.5,
+			GeographicLatitude = 58,
+		},
+		atmosphere = {
+			Density = 0.5,
+			Offset = 0.1,
+			Color = Color3.fromRGB(222, 232, 248),
+			Decay = Color3.fromRGB(150, 170, 200),
+			Glare = 0.2,
+			Haze = 3.4,
+		},
+		colorCorrection = {
+			Brightness = 0.04,
+			Contrast = 0.08,
+			-- Desaturated on purpose. Cold reads as an absence of colour.
+			Saturation = -0.08,
+			TintColor = Color3.fromRGB(238, 244, 255),
+		},
+		sunRays = { Intensity = 0.11, Spread = 0.95 },
+		bloom = { Intensity = 0.7, Size = 28, Threshold = 1.2 },
+		materials = {
+			green = Enum.Material.LeafyGrass,
+			brown = Enum.Material.Wood,
+			cold = Enum.Material.Glacier,
+			lightNeutral = Enum.Material.Snow,
+			darkNeutral = Enum.Material.Rock,
+		},
+	},
+}
+
+local PRESET = PRESETS[CONFIG.PRESET]
+assert(PRESET, ("CONFIG.PRESET %q is not one of Neutral/Lava/Forest/Jungle/Snow"):format(tostring(CONFIG.PRESET)))
+
+local LIGHTING_PROPS = PRESET.lighting
+
+local EFFECTS = {
+	{ className = "Atmosphere", props = PRESET.atmosphere },
+	{ className = "ColorCorrectionEffect", props = PRESET.colorCorrection },
+	{ className = "SunRaysEffect", props = PRESET.sunRays },
+	{ className = "BloomEffect", props = PRESET.bloom },
 }
 
 --[[ Material mapping ----------------------------------------------------- ]]
@@ -125,15 +308,8 @@ local REMAPPABLE = {
 	[Enum.Material.SmoothPlastic] = true,
 }
 
-local MATERIAL_BY_TONE = {
-	green = Enum.Material.LeafyGrass,
-	brown = Enum.Material.Ground,
-	lightNeutral = Enum.Material.Concrete,
-	darkNeutral = Enum.Material.Slate,
-	-- Warm tones are reserved for the lava pass and deliberately skipped here.
-	warm = nil,
-	other = nil,
-}
+-- Warm tones are reserved for the lava surface itself and are never remapped.
+local MATERIAL_BY_TONE = PRESET.materials
 
 --[[ Helpers -------------------------------------------------------------- ]]
 
@@ -164,6 +340,9 @@ local function toneOf(color)
 	end
 	if h < 0.055 or h > 0.94 then
 		return "warm"
+	end
+	if h >= 0.47 and h <= 0.75 then
+		return "cold"
 	end
 	return "other"
 end
@@ -602,7 +781,7 @@ local ORDER = {
 }
 
 print(("\n=== ArtPass — %s%s ==="):format(CONFIG.MODE, dry and " (DRY RUN — nothing changed)" or ""))
-print(("scope: %s"):format(root:GetFullName()))
+print(("scope: %s   preset: %s"):format(root:GetFullName(), CONFIG.PRESET))
 for _, row in ipairs(ORDER) do
 	local count = stats[row[1]]
 	if count and count > 0 then

@@ -38,6 +38,54 @@ return {
 		LowEndFpsThreshold = 35,
 	},
 
+	--[[
+		Rising lava is a DIFFERENT MODE from the Lava table above, not a
+		variant of it. Static lava is a hazard in a checkpointed parkour
+		level: it forgives a clipped toe and sends you back a checkpoint.
+		Rising lava is an elimination race: contact ends your round, there is
+		no grace window, and checkpoints do not apply. Sharing one damage
+		path between them would make one of the two feel wrong.
+	]]
+	RisingLava = {
+		Tag = "RisingLava",
+
+		IntermissionSeconds = 12,
+		WarmupSeconds = 5,
+		RoundSeconds = 150,
+		MinPlayers = 1,
+
+		-- Starts gentle and ramps, so the last thirty seconds are the tense
+		-- ones rather than the whole round being a flat climb.
+		RiseStudsPerSecond = 0.8,
+		RiseAcceleration = 0.012,
+
+		-- Lead time on the "LAVA CLOSING IN" banner, measured in studs of
+		-- clearance below the player rather than seconds, because the rise
+		-- rate changes.
+		WarningClearanceStuds = 14,
+
+		BroadcastHz = 4,
+	},
+
+	--[[
+		The slide. Note what this does to the parkour gap grid: a jump taken
+		out of a slide carries the slide's horizontal speed, so reach scales
+		with Speed rather than WalkSpeed. At these values that is roughly
+		three times a standing jump. Every gap therefore has to be authored
+		as either walk-clearable or slide-required, and SIGNALLED to the
+		player, or it reads as inconsistent.
+	]]
+	Slide = {
+		Key = Enum.KeyCode.LeftShift,
+		GamepadKey = Enum.KeyCode.ButtonL2,
+		Speed = 48,
+		Seconds = 0.55,
+		Cooldown = 1.6,
+		-- A slide is only available with your feet on the ground; an air-dash
+		-- is a different ability and breaks the gap math further.
+		RequireGrounded = true,
+	},
+
 	Checkpoint = {
 		Tag = "Checkpoint",
 		-- Studs above the checkpoint part to place the character on respawn.

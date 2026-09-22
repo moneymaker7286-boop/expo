@@ -22,6 +22,10 @@ local CONFIG = {
 	ORIGIN = nil, -- defaults to 40 studs in front of the camera
 	PLATFORM_SIZE = Vector3.new(12, 1, 12),
 	GAPS = { 4, 6, 8, 10, 12, 14, 16 },
+	-- Keep in sync with Config.Slide. A jump taken out of a slide carries the
+	-- slide's horizontal speed, so it has its own reach and its own row.
+	SLIDE_SPEED = 48,
+	SLIDE_GAPS = { 12, 16, 20, 24, 28, 32 },
 }
 
 local RIG_NAME = "ParkourMetricsRig"
@@ -56,20 +60,33 @@ end
 -- Flat take-off to flat landing: airborne for two symmetric halves.
 local airtime = 2 * math.sqrt((2 * jumpHeight) / gravity)
 local reach = walkSpeed * airtime
+local slideReach = CONFIG.SLIDE_SPEED * airtime
 
 -- The character's own footprint clears a little more than its centre travels.
 local footprint = 2
 local absoluteMax = reach + footprint
+local slideMax = slideReach + footprint
 
 print(("\n=== Parkour metrics ==="))
 print(("  gravity            %.1f"):format(gravity))
 print(("  walk speed         %.1f studs/s"):format(walkSpeed))
+print(("  slide speed        %.1f studs/s"):format(CONFIG.SLIDE_SPEED))
 print(("  jump height        %.2f studs"):format(jumpHeight))
 print(("  airtime            %.3f s"):format(airtime))
-print(("  centre travel      %.2f studs   <- author normal gaps at or under this"):format(reach))
-print(("  absolute ceiling   %.2f studs   <- only for a deliberate skill check"):format(absoluteMax))
-print("\nGaps beyond the ceiling are not hard, they are impossible. Build the")
-print("course on the centre-travel number and keep a margin.\n")
+print("")
+print(("  WALK  centre travel   %.2f studs   <- normal gaps at or under this"):format(reach))
+print(("  WALK  ceiling         %.2f studs"):format(absoluteMax))
+print(("  SLIDE centre travel   %.2f studs   <- slide-required gaps"):format(slideReach))
+print(("  SLIDE ceiling         %.2f studs"):format(slideMax))
+print("")
+print(("  dead zone             %.2f - %.2f studs"):format(absoluteMax, slideReach))
+print("")
+print("Read the dead zone carefully. A gap in that band cannot be walked and")
+print("does not need the slide either -- players will fall, retry, and blame")
+print("the game rather than learn the mechanic. Put every gap decisively on")
+print("one side, and SIGNAL which side it is: give slide-required jumps their")
+print("own platform colour so the requirement is readable before the leap.")
+print("")
 
 --[[ Rig ------------------------------------------------------------------ ]]
 
@@ -112,13 +129,25 @@ local function platform(position: Vector3, label: string, clearable: boolean): B
 	return part
 end
 
-platform(origin, "START", true)
+-- Row one: walk jumps. Row two, offset in Z, is the slide row.
+platform(origin, "WALK START", true)
 
 local cursor = origin
 for _, gap in CONFIG.GAPS do
 	cursor += Vector3.new(CONFIG.PLATFORM_SIZE.X + gap, 0, 0)
 	local clearable = gap <= reach
-	local label = ("%d studs%s"):format(gap, clearable and "" or "  (over the ceiling)")
+	local label = ("%d studs%s"):format(gap, clearable and "" or "  (needs slide)")
+	platform(cursor, label, clearable)
+end
+
+local slideOrigin = origin + Vector3.new(0, 0, CONFIG.PLATFORM_SIZE.Z + 24)
+platform(slideOrigin, "SLIDE START", true)
+
+cursor = slideOrigin
+for _, gap in CONFIG.SLIDE_GAPS do
+	cursor += Vector3.new(CONFIG.PLATFORM_SIZE.X + gap, 0, 0)
+	local clearable = gap <= slideReach
+	local label = ("%d studs%s"):format(gap, clearable and "  (slide)" or "  (impossible)")
 	platform(cursor, label, clearable)
 end
 
