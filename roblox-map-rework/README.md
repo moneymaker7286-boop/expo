@@ -37,10 +37,14 @@ runtime. Paste and run them directly.
    and colour-to-material map, because the correct answer differs per biome: a
    near-white part should become `Snow` on the snow level and `Concrete`
    everywhere else. One global map gets that wrong every time.
-2. **`scripts/ParkourMetricsRig.luau`** — measures what your character can
+2. **`scripts/ScatterTool.luau`** — populates a level with layered vegetation.
+   Point `CONFIG.REGION` at an invisible part covering the area, set
+   `CONFIG.PRESET`, dry-run, then apply. Run it **before** ArtPass on that
+   level, so the art pass lights what the scatter placed.
+3. **`scripts/ParkourMetricsRig.luau`** — measures what your character can
    actually clear and builds a labelled row of test gaps. Run this before
    placing a single platform.
-3. **Tag the map** (below), then start the runtime.
+4. **Tag the map** (below), then start the runtime.
 
 ## Tags
 
@@ -64,6 +68,38 @@ Studio's Properties panel. No script needs editing to author a level.
 
 Every tunable lives in `src/shared/Config.luau`. Nothing else hardcodes a
 number.
+
+## Scattering foliage
+
+`ScatterTool.luau` exists because tree *count* is not what makes a forest read
+as one — **vertical layering** is. A field of trunk-and-ball trees at a single
+height looks like a field of lollipops however many you add. Each clump gets
+four layers:
+
+| Layer | Role |
+| --- | --- |
+| canopy | overhead, wide, occludes the sky |
+| trunk | the mid mass you walk between |
+| shrub | waist height, breaks the floor line |
+| debris | ground litter, kills the flat-plane read |
+
+It places **clumps, not individual plants**. Three thousand separate trees is
+how a forest rework ends at 15 FPS; forty clumps of eight read denser and cost a
+fraction.
+
+Presets are `Jungle` (wide flat canopies, hanging vines), `Forest` (tapering
+conifer silhouettes) and `Snow` (bare trunks, snow caps, no perches).
+
+On Jungle and Forest it also places and tags `MonkeyPerch` nodes in the canopy,
+so `MonkeyService` has somewhere to perch without you placing them by hand.
+
+Everything it creates lives under one `workspace.ScatteredFoliage_<preset>`
+model, so `MODE = "REVERT"` is a single exact `Destroy`. All foliage is
+`CanCollide = false` — nothing should snag a player mid-parkour.
+
+Supply your own art by pointing `CONFIG.TEMPLATE_FOLDER` at a folder of model
+variants; with none, it builds blocky stand-ins so the layout is testable before
+the art exists.
 
 ## Two lava modes, not one
 
